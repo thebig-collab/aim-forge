@@ -201,8 +201,11 @@ class MainWindow(QMainWindow):
         for i,label in enumerate(LABELS.get(lang,LABELS["English"])): self.nav.item(i).setText(label)
 
     def choose_color(self):
-        c=QColorDialog.getColor(QColor(self.color),self)
-        if c.isValid(): self.color=c.name()
+        current=self.color_edit.text().strip() if hasattr(self,"color_edit") else self.color
+        c=QColorDialog.getColor(QColor(current if QColor.isValidColor(current) else "#00ff88"),self)
+        if c.isValid():
+            if hasattr(self,"color_edit"): self.color_edit.setText(c.name())
+            else: self.color=c.name()
 
     def apply_overlay(self):
         try: cfg=self.crosshair_config()
