@@ -2,7 +2,7 @@ import csv
 from pathlib import Path
 from datetime import datetime
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QColor, QKeySequence, QShortcut
+from PySide6.QtGui import QColor, QKeySequence, QShortcut, QPainter, QPen
 from PySide6.QtWidgets import (QMainWindow,QWidget,QHBoxLayout,QVBoxLayout,QLabel,QPushButton,
  QListWidget,QStackedWidget,QFrame,QGridLayout,QComboBox,QSlider,QColorDialog,QSpinBox,
  QLineEdit,QMessageBox,QFileDialog,QTableWidget,QTableWidgetItem,QHeaderView,QCheckBox)
@@ -32,6 +32,27 @@ def make_card(title, note):
     v.setStyleSheet("font-size:22pt;font-weight:700;color:#5fffc5")
     n=QLabel(note); n.setObjectName("muted"); lay.addWidget(t); lay.addWidget(v); lay.addWidget(n)
     return f,v
+
+
+class CrosshairPreview(QWidget):
+    def __init__(self,parent=None):
+        super().__init__(parent); self.setMinimumSize(250,180)
+        self.config={"style":"Classic","size":18,"gap":5,"thickness":2,"color":"#00ff88","opacity":100,"dot":False}
+    def set_config(self,cfg):
+        self.config=dict(cfg); self.update()
+    def paintEvent(self,event):
+        p=QPainter(self); p.setRenderHint(QPainter.Antialiasing); p.fillRect(self.rect(),QColor("#080d19"))
+        c=QColor(self.config.get("color","#00ff88")); c.setAlphaF(max(.1,min(1,float(self.config.get("opacity",100))/100)))
+        s=int(self.config.get("size",18)); g=int(self.config.get("gap",5)); t=int(self.config.get("thickness",2))
+        x,y=self.width()//2,self.height()//2
+        if self.config.get("style")=="Dot" or self.config.get("dot"):
+            p.setPen(Qt.NoPen); p.setBrush(c); d=max(2,t*2); p.drawEllipse(x-d//2,y-d//2,d,d)
+        elif self.config.get("style")=="Circle":
+            p.setPen(QPen(c,t)); p.setBrush(Qt.NoBrush); p.drawEllipse(x-s//2,y-s//2,s,s)
+        else:
+            p.setPen(QPen(c,t,Qt.SolidLine,Qt.RoundCap))
+            p.drawLine(x-s,y,x-g,y); p.drawLine(x+g,y,x+s,y)
+            p.drawLine(x,y-s,x,y-g); p.drawLine(x,y+g,x,y+s)
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -71,18 +92,73 @@ class MainWindow(QMainWindow):
         l.addWidget(quick); l.addStretch(); return w
 
     def crosshair(self):
-        w=QWidget(); l=QVBoxLayout(w); info=QLabel("Desktop overlay only. Check each game's and anti-cheat's overlay policy before enabling.")
-        info.setObjectName("muted"); l.addWidget(info); panel=QFrame(); panel.setObjectName("panel"); g=QGridLayout(panel)
+        w=QWidget(); l=QVBoxLayout(w)
+        info=QLabel("Build a custom crosshair with live preview. Desktop overlay only; follow game and anti-cheat rules.")
+        info.setObjectName("muted"); info.setWordWrap(True); l.addWidget(info)
+        content=QHBoxLayout(); panel=QFrame(); panel.setObjectName("panel"); g=QGridLayout(panel)
         self.style_box=QComboBox(); self.style_box.addItems(["Classic","Dot","Circle"])
         self.size=QSpinBox(); self.size.setRange(2,100); self.size.setValue(18)
         self.gap=QSpinBox(); self.gap.setRange(0,50); self.gap.setValue(5)
         self.thick=QSpinBox(); self.thick.setRange(1,12); self.thick.setValue(2)
         self.opacity=QSlider(Qt.Horizontal); self.opacity.setRange(10,100); self.opacity.setValue(100)
-        color=QPushButton("Choose color"); color.clicked.connect(self.choose_color)
-        for i,(name,widget) in enumerate([("Style",self.style_box),("Size",self.size),("Gap",self.gap),("Thickness",self.thick),("Opacity",self.opacity),("Color",color)]):
+        self.opacity_value=QLabel("100%"); self.dot=QCheckBox("Center dot")
+        self.color_edit=QLineEdit("#00ff88"); self.color_edit.setMaxLength(7)
+        pick=QPushButton("Pick color"); pick.clicked.connect(self.choose_color)
+        cr=QHBoxLayout(); cr.addWidget(self.color_edit); cr.addWidget(pick)
+        for i,(name,widget) in enumerate([("Shape",self.style_box),("Size",self.size),("Gap",self.gap),("Thickness",self.thick),("Opacity",self.opacity)]):
             g.addWidget(QLabel(name),i,0); g.addWidget(widget,i,1)
-        l.addWidget(panel); row=QHBoxLayout(); show=QPushButton("Apply & show overlay"); show.setObjectName("accent"); show.clicked.connect(self.apply_overlay)
-        hide=QPushButton("Hide overlay"); hide.clicked.connect(self.overlay.hide); row.addWidget(show); row.addWidget(hide); l.addLayout(row); l.addStretch(); return w
+        g.addWidget(self.opacity_value,4,2); g.addWidget(self.dot,5,1); g.addWidget(QLabel("HEX color"),6,0); g.addLayout(cr,6,1,1,2)
+        content.addWidget(panel,3); pv=QVBoxLayout(); pv.addWidget(QLabel("LIVE PREVIEW")); self.preview=CrosshairPreview(); pv.addWidget(self.preview,1); content.addLayout(pv,2); l.addLayout(content,1)
+        self.crosshair_game=QLineEdit(); self.crosshair_game.setPlaceholderText("Game name, e.g. Fortnite")
+        row=QHBoxLayout(); row.addWidget(self.crosshair_game)
+        save=QPushButton("Save game profile"); save.setObjectName("accent"); save.clicked.connect(self.save_studio_profile); row.addWidget(save)
+        exp=QPushButton("Export preset"); exp.clicked.connect(self.export_crosshair); row.addWidget(exp)
+        imp=QPushButton("Import preset"); imp.clicked.connect(self.import_crosshair); row.addWidget(imp); l.addLayout(row)
+        actions=QHBoxLayout(); show=QPushButton("Apply & show overlay"); show.setObjectName("accent"); show.clicked.connect(self.apply_overlay)
+        hide=QPushButton("Hide overlay"); hide.clicked.connect(self.overlay.hide); actions.addWidget(show); actions.addWidget(hide); l.addLayout(actions)
+        for widget,signal in [(self.style_box,self.style_box.currentTextChanged),(self.size,self.size.valueChanged),(self.gap,self.gap.valueChanged),(self.thick,self.thick.valueChanged),(self.opacity,self.opacity.valueChanged),(self.dot,self.dot.toggled),(self.color_edit,self.color_edit.textChanged)]:
+            signal.connect(self.update_crosshair_preview)
+        self.opacity.valueChanged.connect(lambda v:self.opacity_value.setText(f"{v}%"))
+        self.update_crosshair_preview(); return w
+
+
+    def crosshair_config(self):
+        color=self.color_edit.text().strip()
+        if not QColor.isValidColor(color): raise ValueError("Enter a valid HEX color such as #00ff88.")
+        return {"style":self.style_box.currentText(),"size":self.size.value(),"gap":self.gap.value(),
+                "thickness":self.thick.value(),"color":QColor(color).name(),"opacity":self.opacity.value(),"dot":self.dot.isChecked()}
+
+    def update_crosshair_preview(self,*_):
+        try: self.preview.set_config(self.crosshair_config())
+        except ValueError: self.preview.set_config({"style":"Classic","size":18,"gap":5,"thickness":2,"color":"#ff3355","opacity":100})
+
+    def save_studio_profile(self):
+        name=self.crosshair_game.text().strip()
+        if not name: QMessageBox.warning(self,"Game missing","Enter a game name."); return
+        try: cfg=self.crosshair_config()
+        except ValueError as e: QMessageBox.warning(self,"Invalid color",str(e)); return
+        storage.save_profile(name,{"crosshair":cfg}); self.load_profiles()
+        QMessageBox.information(self,"Profile saved",f"Crosshair saved for {name}.")
+
+    def export_crosshair(self):
+        import json
+        try: cfg=self.crosshair_config()
+        except ValueError as e: QMessageBox.warning(self,"Invalid color",str(e)); return
+        path,_=QFileDialog.getSaveFileName(self,"Export crosshair","aimforge-crosshair.json","JSON (*.json)")
+        if path: Path(path).write_text(json.dumps(cfg,indent=2),encoding="utf-8")
+
+    def import_crosshair(self):
+        import json
+        path,_=QFileDialog.getOpenFileName(self,"Import crosshair","","JSON (*.json)")
+        if not path: return
+        try:
+            cfg=json.loads(Path(path).read_text(encoding="utf-8"))
+            self.style_box.setCurrentText(cfg.get("style","Classic")); self.size.setValue(int(cfg.get("size",18)))
+            self.gap.setValue(int(cfg.get("gap",5))); self.thick.setValue(int(cfg.get("thickness",2)))
+            op=float(cfg.get("opacity",100)); self.opacity.setValue(int(op*100 if op<=1 else op))
+            self.color_edit.setText(cfg.get("color","#00ff88")); self.dot.setChecked(bool(cfg.get("dot",False)))
+            self.update_crosshair_preview()
+        except Exception as e: QMessageBox.critical(self,"Import failed",f"Invalid preset: {e}")
 
     def monitor_page(self):
         w=QWidget(); l=QVBoxLayout(w); n=QLabel("CPU/RAM are read locally. FPS requires PresentMon CSV. Unsupported GPU sensor fields stay unavailable.")
@@ -94,7 +170,7 @@ class MainWindow(QMainWindow):
     def profiles_page(self):
         w=QWidget(); l=QVBoxLayout(w); row=QHBoxLayout(); self.game=QLineEdit(); self.game.setPlaceholderText("Game name")
         save=QPushButton("Save crosshair profile"); save.setObjectName("accent"); save.clicked.connect(self.save_profile); row.addWidget(self.game); row.addWidget(save); l.addLayout(row)
-        self.profile_table=QTableWidget(0,3); self.profile_table.setHorizontalHeaderLabels(["Game","Style","Updated"]); self.profile_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch); l.addWidget(self.profile_table); self.load_profiles(); return w
+        self.profile_table=QTableWidget(0,3); self.profile_table.setHorizontalHeaderLabels(["Game","Style","Updated"]); self.profile_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch); self.profile_table.cellDoubleClicked.connect(self.apply_selected_profile); l.addWidget(self.profile_table); l.addWidget(QLabel("Double-click a profile to load it in Crosshair Studio.")); self.load_profiles(); return w
 
     def benchmarks_page(self):
         w=QWidget(); l=QVBoxLayout(w); n=QLabel("No benchmark values are bundled. Import sourced records; measured and estimated entries are labeled separately.")
@@ -129,7 +205,10 @@ class MainWindow(QMainWindow):
         if c.isValid(): self.color=c.name()
 
     def apply_overlay(self):
-        self.overlay.configure(self.size.value(),self.gap.value(),self.thick.value(),self.color,self.opacity.value()/100,self.style_box.currentText())
+        try: cfg=self.crosshair_config()
+        except ValueError as e: QMessageBox.warning(self,"Invalid color",str(e)); return
+        self.color=cfg["color"]
+        self.overlay.configure(cfg["size"],cfg["gap"],cfg["thickness"],cfg["color"],cfg["opacity"]/100,cfg["style"],cfg["dot"])
         screen=self.screen()
         if screen: self.overlay.setGeometry(screen.geometry())
         self.overlay.show()
@@ -157,8 +236,20 @@ class MainWindow(QMainWindow):
     def save_profile(self):
         name=self.game.text().strip()
         if not name: QMessageBox.warning(self,"Game missing","Enter a game name."); return
-        storage.save_profile(name,{"crosshair":{"style":self.style_box.currentText(),"size":self.size.value(),"gap":self.gap.value(),"thickness":self.thick.value(),"color":self.color,"opacity":self.opacity.value()/100}})
-        self.load_profiles()
+        try: cfg=self.crosshair_config()
+        except ValueError as e: QMessageBox.warning(self,"Invalid color",str(e)); return
+        storage.save_profile(name,{"crosshair":cfg}); self.load_profiles()
+
+    def apply_selected_profile(self,row,column):
+        item=self.profile_table.item(row,0)
+        if not item: return
+        cfg=storage.profiles().get(item.text(),{}).get("crosshair",{})
+        self.nav.setCurrentRow(1)
+        self.style_box.setCurrentText(cfg.get("style","Classic")); self.size.setValue(int(cfg.get("size",18)))
+        self.gap.setValue(int(cfg.get("gap",5))); self.thick.setValue(int(cfg.get("thickness",2)))
+        op=float(cfg.get("opacity",100)); self.opacity.setValue(int(op*100 if op<=1 else op))
+        self.color_edit.setText(cfg.get("color","#00ff88")); self.dot.setChecked(bool(cfg.get("dot",False)))
+        self.update_crosshair_preview()
 
     def load_profiles(self):
         if not hasattr(self,"profile_table"): return
