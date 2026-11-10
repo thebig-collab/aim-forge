@@ -1,5 +1,6 @@
 
 name: Build AimForge for Windows
+# Rebuild packaged executable with persistent Local AppData storage fix
 
 on:
   workflow_dispatch:
