@@ -12,11 +12,12 @@ class CrosshairOverlay(QWidget):
         self.setAttribute(Qt.WA_ShowWithoutActivating, True)
         self.size_px, self.gap, self.thickness = 18, 5, 2
         self.opacity, self.color, self.style = 1.0, QColor("#00ff88"), "Classic"
+        self.center_dot = False
 
-    def configure(self, size_px, gap, thickness, color, opacity, style):
+    def configure(self, size_px, gap, thickness, color, opacity, style, center_dot=False):
         self.size_px=max(2,min(100,int(size_px))); self.gap=max(0,min(50,int(gap)))
         self.thickness=max(1,min(12,int(thickness))); self.color=QColor(color)
-        self.opacity=max(.1,min(1,float(opacity))); self.style=style; self.update()
+        self.opacity=max(.1,min(1,float(opacity))); self.style=style; self.center_dot=bool(center_dot); self.update()
 
     def paintEvent(self, event):
         p=QPainter(self); p.setRenderHint(QPainter.Antialiasing)
@@ -30,3 +31,6 @@ class CrosshairOverlay(QWidget):
         else:
             p.drawLine(x-s,y,x-g,y); p.drawLine(x+g,y,x+s,y)
             p.drawLine(x,y-s,x,y-g); p.drawLine(x,y+g,x,y+s)
+        if self.center_dot and self.style!="Dot":
+            p.setBrush(c); p.setPen(Qt.NoPen); d=max(2,self.thickness*2)
+            p.drawEllipse(x-d//2,y-d//2,d,d)
