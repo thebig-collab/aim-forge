@@ -231,7 +231,7 @@ class MainWindow(QMainWindow):
         try: cfg=self.crosshair_config()
         except ValueError as e: QMessageBox.warning(self,"Invalid color",str(e)); return
         self.color=cfg["color"]
-        self.overlay.configure(cfg["size"],cfg["gap"],cfg["thickness"],cfg["color"],cfg["opacity"]/100,cfg["style"],cfg["dot"])
+        self.overlay.configure(cfg["size"],cfg["gap"],cfg["thickness"],cfg["color"],cfg["opacity"]/100,cfg["style"],cfg["dot"],cfg["outline"])
         screen=self.screen()
         if screen: self.overlay.setGeometry(screen.geometry())
         self.overlay.show()
