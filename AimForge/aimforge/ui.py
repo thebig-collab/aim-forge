@@ -186,7 +186,7 @@ class MainWindow(QMainWindow):
         for i,(name,widget) in enumerate([("Shape",self.style_box),("Size",self.size),("Gap",self.gap),("Thickness",self.thick),("Opacity",self.opacity)]):
             g.addWidget(QLabel(name),i,0); g.addWidget(widget,i,1)
         g.addWidget(self.opacity_value,4,2); g.addWidget(self.dot,5,1); g.addWidget(self.outline,5,2); g.addWidget(QLabel("HEX color"),6,0); g.addLayout(cr,6,1,1,2)
-        content.addWidget(panel,3); pv=QVBoxLayout(); preview_title=QLabel("LIVE PREVIEW"); preview_title.setStyleSheet("font-weight:700;letter-spacing:1px;color:#aaa1d8"); pv.addWidget(preview_title); self.preview=CrosshairPreview(); pv.addWidget(self.preview,1); l.addLayout(content,1)
+        content.addWidget(panel,3); pv=QVBoxLayout(); preview_title=QLabel("LIVE PREVIEW"); preview_title.setStyleSheet("font-weight:700;letter-spacing:1px;color:#aaa1d8"); pv.addWidget(preview_title); self.preview=CrosshairPreview(); pv.addWidget(self.preview,1); pv_frame=QFrame(); pv_frame.setObjectName("panel"); pv_frame.setLayout(pv); content.addWidget(pv_frame,2); l.addLayout(content,1)
         self.crosshair_game=QLineEdit(); self.crosshair_game.setPlaceholderText("Game name, e.g. Fortnite")
         row=QHBoxLayout(); row.addWidget(self.crosshair_game)
         save=QPushButton("Save game profile"); save.setObjectName("accent"); save.clicked.connect(self.save_studio_profile); row.addWidget(save)
