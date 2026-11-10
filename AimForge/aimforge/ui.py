@@ -37,7 +37,7 @@ def make_card(title, note):
 class CrosshairPreview(QWidget):
     def __init__(self,parent=None):
         super().__init__(parent); self.setMinimumSize(250,180)
-        self.config={"style":"Classic","size":18,"gap":5,"thickness":2,"color":"#00ff88","opacity":100,"dot":False}
+        self.config={"style":"Classic","size":18,"gap":5,"thickness":2,"color":"#00ff88","opacity":100,"dot":False,"outline":False}
     def set_config(self,cfg):
         self.config=dict(cfg); self.update()
     def paintEvent(self,event):
@@ -45,14 +45,21 @@ class CrosshairPreview(QWidget):
         c=QColor(self.config.get("color","#00ff88")); c.setAlphaF(max(.1,min(1,float(self.config.get("opacity",100))/100)))
         s=int(self.config.get("size",18)); g=int(self.config.get("gap",5)); t=int(self.config.get("thickness",2))
         x,y=self.width()//2,self.height()//2
+        outlined=bool(self.config.get("outline",False))
+        def stroke(pen_color,width):
+            p.setPen(QPen(pen_color,width,Qt.SolidLine,Qt.RoundCap)); p.setBrush(Qt.NoBrush)
+            if self.config.get("style")=="Circle": p.drawEllipse(x-s//2,y-s//2,s,s)
+            else:
+                p.drawLine(x-s,y,x-g,y); p.drawLine(x+g,y,x+s,y)
+                p.drawLine(x,y-s,x,y-g); p.drawLine(x,y+g,x,y+s)
         if self.config.get("style")=="Dot" or self.config.get("dot"):
-            p.setPen(Qt.NoPen); p.setBrush(c); d=max(2,t*2); p.drawEllipse(x-d//2,y-d//2,d,d)
-        elif self.config.get("style")=="Circle":
-            p.setPen(QPen(c,t)); p.setBrush(Qt.NoBrush); p.drawEllipse(x-s//2,y-s//2,s,s)
+            d=max(2,t*2)
+            if outlined:
+                p.setPen(Qt.NoPen); p.setBrush(QColor(0,0,0,c.alpha())); p.drawEllipse(x-d//2-2,y-d//2-2,d+4,d+4)
+            p.setPen(Qt.NoPen); p.setBrush(c); p.drawEllipse(x-d//2,y-d//2,d,d)
         else:
-            p.setPen(QPen(c,t,Qt.SolidLine,Qt.RoundCap))
-            p.drawLine(x-s,y,x-g,y); p.drawLine(x+g,y,x+s,y)
-            p.drawLine(x,y-s,x,y-g); p.drawLine(x,y+g,x,y+s)
+            if outlined: stroke(QColor(0,0,0,c.alpha()),t+4)
+            stroke(c,t)
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -101,13 +108,13 @@ class MainWindow(QMainWindow):
         self.gap=QSpinBox(); self.gap.setRange(0,50); self.gap.setValue(5)
         self.thick=QSpinBox(); self.thick.setRange(1,12); self.thick.setValue(2)
         self.opacity=QSlider(Qt.Horizontal); self.opacity.setRange(10,100); self.opacity.setValue(100)
-        self.opacity_value=QLabel("100%"); self.dot=QCheckBox("Center dot")
+        self.opacity_value=QLabel("100%"); self.dot=QCheckBox("Center dot"); self.outline=QCheckBox("Outline (black border)")
         self.color_edit=QLineEdit("#00ff88"); self.color_edit.setMaxLength(7)
         pick=QPushButton("Pick color"); pick.clicked.connect(self.choose_color)
         cr=QHBoxLayout(); cr.addWidget(self.color_edit); cr.addWidget(pick)
         for i,(name,widget) in enumerate([("Shape",self.style_box),("Size",self.size),("Gap",self.gap),("Thickness",self.thick),("Opacity",self.opacity)]):
             g.addWidget(QLabel(name),i,0); g.addWidget(widget,i,1)
-        g.addWidget(self.opacity_value,4,2); g.addWidget(self.dot,5,1); g.addWidget(QLabel("HEX color"),6,0); g.addLayout(cr,6,1,1,2)
+        g.addWidget(self.opacity_value,4,2); g.addWidget(self.dot,5,1); g.addWidget(self.outline,5,2); g.addWidget(QLabel("HEX color"),6,0); g.addLayout(cr,6,1,1,2)
         content.addWidget(panel,3); pv=QVBoxLayout(); pv.addWidget(QLabel("LIVE PREVIEW")); self.preview=CrosshairPreview(); pv.addWidget(self.preview,1); content.addLayout(pv,2); l.addLayout(content,1)
         self.crosshair_game=QLineEdit(); self.crosshair_game.setPlaceholderText("Game name, e.g. Fortnite")
         row=QHBoxLayout(); row.addWidget(self.crosshair_game)
@@ -116,7 +123,7 @@ class MainWindow(QMainWindow):
         imp=QPushButton("Import preset"); imp.clicked.connect(self.import_crosshair); row.addWidget(imp); l.addLayout(row)
         actions=QHBoxLayout(); show=QPushButton("Apply & show overlay"); show.setObjectName("accent"); show.clicked.connect(self.apply_overlay)
         hide=QPushButton("Hide overlay"); hide.clicked.connect(self.overlay.hide); actions.addWidget(show); actions.addWidget(hide); l.addLayout(actions)
-        for widget,signal in [(self.style_box,self.style_box.currentTextChanged),(self.size,self.size.valueChanged),(self.gap,self.gap.valueChanged),(self.thick,self.thick.valueChanged),(self.opacity,self.opacity.valueChanged),(self.dot,self.dot.toggled),(self.color_edit,self.color_edit.textChanged)]:
+        for widget,signal in [(self.style_box,self.style_box.currentTextChanged),(self.size,self.size.valueChanged),(self.gap,self.gap.valueChanged),(self.thick,self.thick.valueChanged),(self.opacity,self.opacity.valueChanged),(self.dot,self.dot.toggled),(self.outline,self.outline.toggled),(self.color_edit,self.color_edit.textChanged)]:
             signal.connect(self.update_crosshair_preview)
         self.opacity.valueChanged.connect(lambda v:self.opacity_value.setText(f"{v}%"))
         self.update_crosshair_preview(); return w
@@ -126,7 +133,7 @@ class MainWindow(QMainWindow):
         color=self.color_edit.text().strip()
         if not QColor.isValidColor(color): raise ValueError("Enter a valid HEX color such as #00ff88.")
         return {"style":self.style_box.currentText(),"size":self.size.value(),"gap":self.gap.value(),
-                "thickness":self.thick.value(),"color":QColor(color).name(),"opacity":self.opacity.value(),"dot":self.dot.isChecked()}
+                "thickness":self.thick.value(),"color":QColor(color).name(),"opacity":self.opacity.value(),"dot":self.dot.isChecked(),"outline":self.outline.isChecked()}
 
     def update_crosshair_preview(self,*_):
         try: self.preview.set_config(self.crosshair_config())
@@ -156,7 +163,7 @@ class MainWindow(QMainWindow):
             self.style_box.setCurrentText(cfg.get("style","Classic")); self.size.setValue(int(cfg.get("size",18)))
             self.gap.setValue(int(cfg.get("gap",5))); self.thick.setValue(int(cfg.get("thickness",2)))
             op=float(cfg.get("opacity",100)); self.opacity.setValue(int(op*100 if op<=1 else op))
-            self.color_edit.setText(cfg.get("color","#00ff88")); self.dot.setChecked(bool(cfg.get("dot",False)))
+            self.color_edit.setText(cfg.get("color","#00ff88")); self.dot.setChecked(bool(cfg.get("dot",False))); self.outline.setChecked(bool(cfg.get("outline",False)))
             self.update_crosshair_preview()
         except Exception as e: QMessageBox.critical(self,"Import failed",f"Invalid preset: {e}")
 
@@ -173,10 +180,18 @@ class MainWindow(QMainWindow):
         self.profile_table=QTableWidget(0,3); self.profile_table.setHorizontalHeaderLabels(["Game","Style","Updated"]); self.profile_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch); self.profile_table.cellDoubleClicked.connect(self.apply_selected_profile); l.addWidget(self.profile_table); l.addWidget(QLabel("Double-click a profile to load it in Crosshair Studio.")); self.load_profiles(); return w
 
     def benchmarks_page(self):
-        w=QWidget(); l=QVBoxLayout(w); n=QLabel("No benchmark values are bundled. Import sourced records; measured and estimated entries are labeled separately.")
-        n.setObjectName("muted"); l.addWidget(n); b=QPushButton("Import benchmark CSV"); b.clicked.connect(self.import_benchmarks); l.addWidget(b)
-        self.bench_count=QLabel(); l.addWidget(self.bench_count); self.bench_table=QTableWidget(0,7)
-        self.bench_table.setHorizontalHeaderLabels(["Game","CPU","GPU","Resolution","Preset","Avg FPS","Kind"]); self.bench_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch); l.addWidget(self.bench_table); self.load_benchmarks(); return w
+        w=QWidget(); l=QVBoxLayout(w)
+        n=QLabel("Import benchmark measurements with their source. Search and compare saved records; FPS values are not invented.")
+        n.setObjectName("muted"); n.setWordWrap(True); l.addWidget(n)
+        bar=QHBoxLayout(); b=QPushButton("Import CSV"); b.clicked.connect(self.import_benchmarks); bar.addWidget(b)
+        ex=QPushButton("Export CSV"); ex.clicked.connect(self.export_benchmarks); bar.addWidget(ex)
+        self.bench_search=QLineEdit(); self.bench_search.setPlaceholderText("Filter by game, CPU, GPU, resolution or preset…")
+        self.bench_search.textChanged.connect(self.load_benchmarks); bar.addWidget(self.bench_search,1); l.addLayout(bar)
+        self.bench_count=QLabel(); l.addWidget(self.bench_count); self.bench_table=QTableWidget(0,9)
+        self.bench_table.setHorizontalHeaderLabels(["Game","CPU","GPU","Resolution","Preset","Avg FPS","1% Low","Kind","Source"])
+        self.bench_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.bench_table.horizontalHeader().setStretchLastSection(True); l.addWidget(self.bench_table)
+        self.load_benchmarks(); return w
 
     def advisor_page(self):
         w=QWidget(); l=QVBoxLayout(w); l.addWidget(QLabel("Compare sourced benchmark scores and real upgrade prices. This does not claim guaranteed FPS uplift."))
@@ -268,22 +283,53 @@ class MainWindow(QMainWindow):
         try:
             with open(path,encoding="utf-8-sig",newline="") as f:
                 reader=csv.DictReader(f)
-                if not required.issubset(set(reader.fieldnames or [])): raise ValueError("Missing required columns; see benchmark_template.csv.")
+                headers={str(h or "").strip().lower() for h in (reader.fieldnames or [])}
+                if not required.issubset(headers):
+                    missing=", ".join(sorted(required-headers))
+                    raise ValueError(f"Missing required columns: {missing}. Follow benchmark_template.csv.")
                 rows=[]
-                for r in reader:
-                    if r["kind"] not in ("measured","estimated"): raise ValueError("kind must be measured or estimated")
-                    a=float(r["avg_fps"]); low=float(r["one_percent_low"])
-                    if a<=0 or low<0: raise ValueError("Invalid FPS values")
-                    rows.append({**r,"avg_fps":a,"one_percent_low":low})
-            storage.add_benchmarks(rows); self.load_benchmarks(); QMessageBox.information(self,"Imported",f"{len(rows)} records imported.")
+                for line_no,r in enumerate(reader,2):
+                    row={str(k or "").strip().lower():str(v or "").strip() for k,v in r.items() if k is not None}
+                    if not any(row.values()): continue
+                    for key in ("game","cpu","gpu","resolution","preset","source","benchmark_date","kind"):
+                        if not row.get(key): raise ValueError(f"Row {line_no}: {key} cannot be blank.")
+                    kind=row["kind"].lower()
+                    if kind not in ("measured","estimated"): raise ValueError(f"Row {line_no}: kind must be measured or estimated.")
+                    try: avg=float(row["avg_fps"]); low=float(row["one_percent_low"])
+                    except (ValueError,TypeError): raise ValueError(f"Row {line_no}: FPS values must be numbers.")
+                    if avg<=0 or low<=0 or low>avg: raise ValueError(f"Row {line_no}: FPS must be positive and 1% low cannot exceed average FPS.")
+                    rows.append({**row,"kind":kind,"avg_fps":avg,"one_percent_low":low})
+            if not rows: raise ValueError("The CSV contains no benchmark records.")
+            storage.add_benchmarks(rows); self.load_benchmarks()
+            QMessageBox.information(self,"Imported",f"{len(rows)} valid benchmark records imported.")
         except Exception as e: QMessageBox.critical(self,"Import failed",str(e))
 
-    def load_benchmarks(self):
+    def load_benchmarks(self,*_):
         if not hasattr(self,"bench_table"): return
-        rows=storage.benchmarks(); self.bench_count.setText(f"Records stored locally: {len(rows)}"); self.bench_table.setRowCount(min(500,len(rows)))
-        for i,r in enumerate(rows[-500:]):
-            for j,v in enumerate([r.get("game"),r.get("cpu"),r.get("gpu"),r.get("resolution"),r.get("preset"),r.get("avg_fps"),r.get("kind")]):
-                self.bench_table.setItem(i,j,QTableWidgetItem(str(v)))
+        rows=storage.benchmarks()
+        if not isinstance(rows,list): rows=[]
+        query=self.bench_search.text().strip().casefold() if hasattr(self,"bench_search") else ""
+        filtered=[r for r in rows if isinstance(r,dict) and (not query or query in " ".join(str(r.get(k,"")) for k in ("game","cpu","gpu","resolution","preset","kind","source")).casefold())]
+        self.bench_count.setText(f"Showing {min(500,len(filtered))} of {len(filtered)} matching records • {len(rows)} total saved")
+        shown=filtered[-500:]; self.bench_table.setRowCount(len(shown))
+        for i,r in enumerate(shown):
+            vals=[r.get("game",""),r.get("cpu",""),r.get("gpu",""),r.get("resolution",""),r.get("preset",""),r.get("avg_fps",""),r.get("one_percent_low",""),r.get("kind",""),r.get("source","")]
+            for j,v in enumerate(vals): self.bench_table.setItem(i,j,QTableWidgetItem(str(v)))
+
+    def export_benchmarks(self):
+        rows=storage.benchmarks()
+        if not isinstance(rows,list) or not rows:
+            QMessageBox.information(self,"No benchmarks","There are no saved benchmark records to export."); return
+        path,_=QFileDialog.getSaveFileName(self,"Export benchmark CSV","aimforge-benchmarks.csv","CSV (*.csv)")
+        if not path: return
+        fields=["game","cpu","gpu","resolution","preset","avg_fps","one_percent_low","source","benchmark_date","kind"]
+        try:
+            with open(path,"w",encoding="utf-8-sig",newline="") as f:
+                writer=csv.DictWriter(f,fieldnames=fields,extrasaction="ignore"); writer.writeheader()
+                for row in rows:
+                    if isinstance(row,dict): writer.writerow({k:row.get(k,"") for k in fields})
+            QMessageBox.information(self,"Export complete",f"Exported {len(rows)} records.")
+        except OSError as e: QMessageBox.critical(self,"Export failed",str(e))
 
     def compare(self):
         try:
