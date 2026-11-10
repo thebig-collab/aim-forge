@@ -52,7 +52,7 @@ class CrosshairPreview(QWidget):
             else:
                 p.drawLine(x-s,y,x-g,y); p.drawLine(x+g,y,x+s,y)
                 p.drawLine(x,y-s,x,y-g); p.drawLine(x,y+g,x,y+s)
-        if self.config.get("style")=="Dot" or self.config.get("dot"):
+        if self.config.get("style")=="Dot":
             d=max(2,t*2)
             if outlined:
                 p.setPen(Qt.NoPen); p.setBrush(QColor(0,0,0,c.alpha())); p.drawEllipse(x-d//2-2,y-d//2-2,d+4,d+4)
@@ -60,6 +60,11 @@ class CrosshairPreview(QWidget):
         else:
             if outlined: stroke(QColor(0,0,0,c.alpha()),t+4)
             stroke(c,t)
+            if self.config.get("dot"):
+                d=max(2,t*2)
+                if outlined:
+                    p.setPen(Qt.NoPen); p.setBrush(QColor(0,0,0,c.alpha())); p.drawEllipse(x-d//2-2,y-d//2-2,d+4,d+4)
+                p.setPen(Qt.NoPen); p.setBrush(c); p.drawEllipse(x-d//2,y-d//2,d,d)
 
 class MainWindow(QMainWindow):
     def __init__(self):
