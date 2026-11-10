@@ -110,7 +110,7 @@ class MainWindow(QMainWindow):
         h=QLabel("Your aim. Your style."); h.setStyleSheet("font-size:25pt;font-weight:800;color:#c7bbff")
         sub=QLabel("Build a crosshair that feels right. Save it, switch it, and take it into your games."); sub.setObjectName("muted")
         hl.addWidget(h); hl.addWidget(sub); l.addWidget(hero)
-         sub.setObjectName("muted"); grid=QGridLayout(); self.dash={}
+        grid=QGridLayout(); self.dash={}
         for i,(k,note) in enumerate([("Live FPS","PresentMon CSV required"),("CPU usage","Live system utilization"),("RAM used","Used memory"),("GPU temperature","Sensor provider required")]):
             f,v=make_card(k,note); self.dash[k]=v; grid.addWidget(f,0,i)
         l.addLayout(grid)
@@ -193,7 +193,7 @@ class MainWindow(QMainWindow):
         exp=QPushButton("Export preset"); exp.clicked.connect(self.export_crosshair); row.addWidget(exp)
         imp=QPushButton("Import preset"); imp.clicked.connect(self.import_crosshair); row.addWidget(imp); l.addLayout(row)
         actions=QHBoxLayout(); show=QPushButton("Apply & show overlay"); show.setObjectName("accent"); show.clicked.connect(self.apply_overlay)
-        hide=QPushButton("Hide overlay"); hide.clicked.connect(self.overlay.hide); actions.addWidget(show); actions.addWidget(hide); l.addLayout(actions)
+        hide=QPushButton("Hide overlay"); hide.clicked.connect(self.hide_overlay); actions.addWidget(show); actions.addWidget(hide); l.addLayout(actions)
         for widget,signal in [(self.style_box,self.style_box.currentTextChanged),(self.size,self.size.valueChanged),(self.gap,self.gap.valueChanged),(self.thick,self.thick.valueChanged),(self.opacity,self.opacity.valueChanged),(self.dot,self.dot.toggled),(self.outline,self.outline.toggled),(self.color_edit,self.color_edit.textChanged)]:
             signal.connect(self.update_crosshair_preview)
         self.opacity.valueChanged.connect(lambda v:self.opacity_value.setText(f"{v}%"))
@@ -304,9 +304,11 @@ class MainWindow(QMainWindow):
         self.overlay_status.setText("●  OVERLAY ON"); self.overlay_status.setStyleSheet("color:#8bdfb0;padding:12px")
         self.quick_toggle.setText("Hide Crosshair")
 
+    def hide_overlay(self):
+        self.overlay.hide(); self.overlay_status.setText("●  OVERLAY OFF"); self.overlay_status.setStyleSheet("color:#858ba3;padding:12px"); self.quick_toggle.setText("Show Crosshair")
+
     def toggle_overlay(self):
-        if self.overlay.isVisible():
-            self.overlay.hide(); self.overlay_status.setText("●  OVERLAY OFF"); self.overlay_status.setStyleSheet("color:#858ba3;padding:12px"); self.quick_toggle.setText("Show Crosshair")
+        if self.overlay.isVisible(): self.hide_overlay()
         else: self.apply_overlay()
 
     def select_csv(self):
