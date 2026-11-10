@@ -12,18 +12,23 @@ from . import storage
 from .i18n import LANGUAGES, RTL, LABELS
 
 STYLE = """
-QWidget { background:#0b1020; color:#e7edf7; font-family:'Segoe UI'; font-size:10pt; }
-QLabel#muted { color:#8c9ab2; }
-QFrame#panel { background:#131c30; border:1px solid #263550; border-radius:12px; }
-QPushButton { background:#1d2b45; border:1px solid #344968; border-radius:8px; padding:9px 13px; }
-QPushButton:hover { background:#293d60; }
-QPushButton#accent { background:#00b884; color:#04140f; font-weight:700; border:0; }
-QListWidget { background:#10182a; border:0; padding:8px; }
-QListWidget::item { padding:12px; border-radius:7px; }
-QListWidget::item:selected { background:#1b3e45; color:#5fffc5; }
-QLineEdit,QSpinBox,QComboBox { background:#0e1728; border:1px solid #344968; border-radius:7px; padding:7px; }
-QTableWidget { background:#10182a; gridline-color:#263550; }
-QHeaderView::section { background:#1a2942; padding:7px; border:0; }
+QWidget { background:#0b0d16; color:#eef0fa; font-family:'Segoe UI'; font-size:10pt; }
+QLabel#muted { color:#858ba3; }
+QFrame#panel { background:#141725; border:1px solid #292d42; border-radius:13px; }
+QPushButton { background:#1b2032; border:1px solid #30364e; border-radius:9px; padding:10px 14px; }
+QPushButton:hover { background:#282e45; border-color:#6655c9; }
+QPushButton#accent { background:#7657f6; color:white; font-weight:700; border:0; }
+QPushButton#accent:hover { background:#896eff; }
+QListWidget { background:#090b12; border:0; padding:10px; outline:0; }
+QListWidget::item { padding:13px 12px; border-radius:8px; color:#a6abc0; }
+QListWidget::item:selected { background:#24203c; color:#b9aaff; border-left:3px solid #8b70ff; }
+QLineEdit,QSpinBox,QComboBox { background:#101321; border:1px solid #30364e; border-radius:8px; padding:8px; selection-background-color:#7657f6; }
+QSlider::groove:horizontal { height:5px; background:#30364e; border-radius:2px; }
+QSlider::handle:horizontal { background:#9b83ff; width:14px; margin:-5px 0; border-radius:7px; }
+QCheckBox { spacing:8px; }
+QCheckBox::indicator { width:16px; height:16px; }
+QTableWidget { background:#101321; gridline-color:#292d42; border:1px solid #292d42; border-radius:8px; }
+QHeaderView::section { background:#1b2032; color:#aeb4ca; padding:8px; border:0; }
 """
 
 def make_card(title, note):
@@ -79,12 +84,20 @@ class MainWindow(QMainWindow):
         center=QWidget(); self.setCentralWidget(center); root=QHBoxLayout(center); root.setContentsMargins(0,0,0,0)
         side=QFrame(); side.setFixedWidth(220); side.setStyleSheet("background:#080d19;border:0")
         sl=QVBoxLayout(side); brand=QLabel("AIMFORGE"); brand.setStyleSheet("font-size:21pt;font-weight:900;color:#5fffc5;padding:16px")
-        sl.addWidget(brand); self.nav=QListWidget(); self.pages=["Dashboard","Crosshair Studio","Live Monitor","Game Profiles","Benchmarks","Upgrade Advisor","Settings"]
+        sl.addWidget(brand)
+        tagline=QLabel("PRECISION • CONTROL • PLAY"); tagline.setStyleSheet("font-size:8pt;color:#777d96;padding:0 16px 14px")
+        sl.addWidget(tagline); self.nav=QListWidget()
+        self.pages=["Home","Browse Crosshairs","Designer","Saved Profiles","PC Monitor","Benchmarks","Settings"]
         self.nav.addItems(self.pages); sl.addWidget(self.nav); sl.addStretch()
-        sl.addWidget(QLabel("CTRL + SHIFT + X\\nToggle crosshair")); root.addWidget(side)
-        body=QVBoxLayout(); body.setContentsMargins(24,20,24,20); self.title=QLabel("Dashboard"); self.title.setStyleSheet("font-size:20pt;font-weight:700")
-        body.addWidget(self.title); self.stack=QStackedWidget()
-        for fn in [self.dashboard,self.crosshair,self.monitor_page,self.profiles_page,self.benchmarks_page,self.advisor_page,self.settings_page]:
+        self.overlay_status=QLabel("●  OVERLAY OFF"); self.overlay_status.setStyleSheet("color:#858ba3;padding:12px")
+        sl.addWidget(self.overlay_status)
+        sl.addWidget(QLabel("CTRL + SHIFT + X  •  Toggle")); root.addWidget(side)
+        body=QVBoxLayout(); body.setContentsMargins(28,22,28,22)
+        header=QHBoxLayout(); self.title=QLabel("Home"); self.title.setStyleSheet("font-size:22pt;font-weight:750")
+        self.quick_toggle=QPushButton("Show Crosshair"); self.quick_toggle.setObjectName("accent"); self.quick_toggle.clicked.connect(self.toggle_overlay)
+        header.addWidget(self.title); header.addStretch(); header.addWidget(self.quick_toggle); body.addLayout(header)
+        self.stack=QStackedWidget()
+        for fn in [self.dashboard,self.browse_page,self.crosshair,self.profiles_page,self.monitor_page,self.benchmarks_page,self.settings_page]:
             self.stack.addWidget(fn())
         body.addWidget(self.stack); self.nav.currentRowChanged.connect(self.change_page); self.nav.setCurrentRow(0); root.addLayout(body,1)
 
@@ -92,20 +105,73 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(i); self.title.setText(self.pages[i])
 
     def dashboard(self):
-        w=QWidget(); l=QVBoxLayout(w); l.addWidget(QLabel("Your gaming command center"))
-        sub=QLabel("Local-first tools for crosshairs, PC telemetry and performance data."); sub.setObjectName("muted"); l.addWidget(sub)
-        grid=QGridLayout(); self.dash={}
+        w=QWidget(); l=QVBoxLayout(w)
+        hero=QFrame(); hero.setObjectName("panel"); hl=QVBoxLayout(hero)
+        h=QLabel("Your aim. Your style."); h.setStyleSheet("font-size:25pt;font-weight:800;color:#c7bbff")
+        sub=QLabel("Build a crosshair that feels right. Save it, switch it, and take it into your games."); sub.setObjectName("muted")
+        hl.addWidget(h); hl.addWidget(sub); l.addWidget(hero)
+         sub.setObjectName("muted"); grid=QGridLayout(); self.dash={}
         for i,(k,note) in enumerate([("Live FPS","PresentMon CSV required"),("CPU usage","Live system utilization"),("RAM used","Used memory"),("GPU temperature","Sensor provider required")]):
             f,v=make_card(k,note); self.dash[k]=v; grid.addWidget(f,0,i)
         l.addLayout(grid)
         quick=QFrame(); quick.setObjectName("panel"); q=QVBoxLayout(quick); q.addWidget(QLabel("Quick actions"))
-        for label,index in [("Open Crosshair Studio",1),("Open Live Monitor",2),("Game Profiles",3)]:
+        for label,index in [("Browse Crosshairs",1),("Open Designer",2),("Saved Profiles",3)]:
             b=QPushButton(label); b.clicked.connect(lambda checked=False,n=index:self.nav.setCurrentRow(n)); q.addWidget(b)
         l.addWidget(quick); l.addStretch(); return w
 
+    def browse_page(self):
+        w=QWidget(); l=QVBoxLayout(w)
+        intro=QLabel("Pick a starting point. Every preset is editable in the Designer."); intro.setObjectName("muted"); l.addWidget(intro)
+        self.preset_search=QLineEdit(); self.preset_search.setPlaceholderText("Search presets…"); self.preset_search.textChanged.connect(self.filter_presets); l.addWidget(self.preset_search)
+        self.preset_grid=QGridLayout(); l.addLayout(self.preset_grid); l.addStretch()
+        self.preset_cards=[]
+        presets=[
+            ("Neon Classic","Classic",22,5,2,"#00ff88",100,False,True),
+            ("Clean White","Classic",18,6,2,"#ffffff",100,False,False),
+            ("Tiny Cyan","Classic",10,3,1,"#00e5ff",100,True,False),
+            ("Violet Dot","Dot",8,0,3,"#a78bfa",100,False,True),
+            ("Minimal Red","Classic",14,4,1,"#ff4655",95,False,False),
+            ("Precision Circle","Circle",24,0,2,"#f8fafc",90,False,True),
+            ("Toxic Green","Classic",20,2,3,"#7CFC00",100,True,True),
+            ("Gold Compact","Classic",12,3,2,"#ffc857",100,False,True),
+            ("Ice Blue","Classic",26,7,2,"#60a5fa",85,False,True),
+            ("Pink Dot","Dot",6,0,2,"#ff70c8",100,False,False),
+            ("Stealth Gray","Classic",16,5,2,"#d1d5db",75,False,True),
+            ("Wide Tactical","Classic",30,9,2,"#facc15",100,False,True)]
+        self.presets=[]
+        for name,style,size,gap,thick,color,opacity,dot,outline in presets:
+            cfg={"style":style,"size":size,"gap":gap,"thickness":thick,"color":color,"opacity":opacity,"dot":dot,"outline":outline}
+            card=QFrame(); card.setObjectName("panel"); cl=QVBoxLayout(card)
+            sample=QLabel("✛" if style=="Classic" else ("●" if style=="Dot" else "◎")); sample.setAlignment(Qt.AlignCenter)
+            sample.setStyleSheet(f"font-size:32pt;font-weight:300;color:{color};padding:12px")
+            title=QLabel(name); title.setStyleSheet("font-weight:700")
+            btn=QPushButton("Use preset"); btn.setObjectName("accent"); btn.clicked.connect(lambda checked=False,cfg=cfg:self.use_preset(cfg))
+            cl.addWidget(sample); cl.addWidget(title); cl.addWidget(btn)
+            self.presets.append((name,card));
+        self.filter_presets(); return w
+
+    def filter_presets(self,*_):
+        if not hasattr(self,"preset_grid"): return
+        while self.preset_grid.count():
+            item=self.preset_grid.takeAt(0)
+            if item.widget(): item.widget().setParent(None)
+        query=self.preset_search.text().casefold().strip()
+        visible=[(name,card) for name,card in self.presets if not query or query in name.casefold()]
+        for i,(_,card) in enumerate(visible): self.preset_grid.addWidget(card,i//3,i%3)
+
+    def use_preset(self,cfg):
+        self.nav.setCurrentRow(2); self.load_crosshair_config(cfg)
+
+    def load_crosshair_config(self,cfg):
+        self.style_box.setCurrentText(cfg.get("style","Classic")); self.size.setValue(int(cfg.get("size",18)))
+        self.gap.setValue(int(cfg.get("gap",5))); self.thick.setValue(int(cfg.get("thickness",2)))
+        op=float(cfg.get("opacity",100)); self.opacity.setValue(int(op*100 if op<=1 else op))
+        self.color_edit.setText(cfg.get("color","#00ff88")); self.dot.setChecked(bool(cfg.get("dot",False)))
+        self.outline.setChecked(bool(cfg.get("outline",False))); self.update_crosshair_preview()
+
     def crosshair(self):
         w=QWidget(); l=QVBoxLayout(w)
-        info=QLabel("Build a custom crosshair with live preview. Desktop overlay only; follow game and anti-cheat rules.")
+        info=QLabel("DESIGNER  /  Customize every detail, preview instantly, then apply or save your design. Overlay-only — it does not modify game files.")
         info.setObjectName("muted"); info.setWordWrap(True); l.addWidget(info)
         content=QHBoxLayout(); panel=QFrame(); panel.setObjectName("panel"); g=QGridLayout(panel)
         self.style_box=QComboBox(); self.style_box.addItems(["Classic","Dot","Circle"])
@@ -120,7 +186,7 @@ class MainWindow(QMainWindow):
         for i,(name,widget) in enumerate([("Shape",self.style_box),("Size",self.size),("Gap",self.gap),("Thickness",self.thick),("Opacity",self.opacity)]):
             g.addWidget(QLabel(name),i,0); g.addWidget(widget,i,1)
         g.addWidget(self.opacity_value,4,2); g.addWidget(self.dot,5,1); g.addWidget(self.outline,5,2); g.addWidget(QLabel("HEX color"),6,0); g.addLayout(cr,6,1,1,2)
-        content.addWidget(panel,3); pv=QVBoxLayout(); pv.addWidget(QLabel("LIVE PREVIEW")); self.preview=CrosshairPreview(); pv.addWidget(self.preview,1); content.addLayout(pv,2); l.addLayout(content,1)
+        content.addWidget(panel,3); pv=QVBoxLayout(); preview_title=QLabel("LIVE PREVIEW"); preview_title.setStyleSheet("font-weight:700;letter-spacing:1px;color:#aaa1d8"); pv.addWidget(preview_title); self.preview=CrosshairPreview(); pv.addWidget(self.preview,1); l.addLayout(content,1)
         self.crosshair_game=QLineEdit(); self.crosshair_game.setPlaceholderText("Game name, e.g. Fortnite")
         row=QHBoxLayout(); row.addWidget(self.crosshair_game)
         save=QPushButton("Save game profile"); save.setObjectName("accent"); save.clicked.connect(self.save_studio_profile); row.addWidget(save)
@@ -208,7 +274,7 @@ class MainWindow(QMainWindow):
         self.advice=QLabel("Enter scores and price."); self.advice.setWordWrap(True); l.addWidget(self.advice); l.addStretch(); return w
 
     def settings_page(self):
-        w=QWidget(); l=QVBoxLayout(w); l.addWidget(QLabel("Local settings and data management"))
+        w=QWidget(); l=QVBoxLayout(w); l.addWidget(QLabel("Preferences & local data"))
         lang=QComboBox(); lang.addItems(LANGUAGES); lang.currentTextChanged.connect(self.set_language); l.addWidget(QLabel("Language")); l.addWidget(lang)
         l.addWidget(QLabel("Hebrew and Arabic switch the interface direction to RTL."))
         b=QPushButton("Export local backup"); b.clicked.connect(self.backup); l.addWidget(b)
@@ -235,9 +301,12 @@ class MainWindow(QMainWindow):
         screen=self.screen()
         if screen: self.overlay.setGeometry(screen.geometry())
         self.overlay.show()
+        self.overlay_status.setText("●  OVERLAY ON"); self.overlay_status.setStyleSheet("color:#8bdfb0;padding:12px")
+        self.quick_toggle.setText("Hide Crosshair")
 
     def toggle_overlay(self):
-        if self.overlay.isVisible(): self.overlay.hide()
+        if self.overlay.isVisible():
+            self.overlay.hide(); self.overlay_status.setText("●  OVERLAY OFF"); self.overlay_status.setStyleSheet("color:#858ba3;padding:12px"); self.quick_toggle.setText("Show Crosshair")
         else: self.apply_overlay()
 
     def select_csv(self):
@@ -267,12 +336,8 @@ class MainWindow(QMainWindow):
         item=self.profile_table.item(row,0)
         if not item: return
         cfg=storage.profiles().get(item.text(),{}).get("crosshair",{})
-        self.nav.setCurrentRow(1)
-        self.style_box.setCurrentText(cfg.get("style","Classic")); self.size.setValue(int(cfg.get("size",18)))
-        self.gap.setValue(int(cfg.get("gap",5))); self.thick.setValue(int(cfg.get("thickness",2)))
-        op=float(cfg.get("opacity",100)); self.opacity.setValue(int(op*100 if op<=1 else op))
-        self.color_edit.setText(cfg.get("color","#00ff88")); self.dot.setChecked(bool(cfg.get("dot",False)))
-        self.update_crosshair_preview()
+        self.nav.setCurrentRow(2)
+        self.load_crosshair_config(cfg)
 
     def load_profiles(self):
         if not hasattr(self,"profile_table"): return
