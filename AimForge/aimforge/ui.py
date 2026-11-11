@@ -42,7 +42,7 @@ def make_card(title, note):
 class CrosshairPreview(QWidget):
     def __init__(self,parent=None):
         super().__init__(parent); self.setMinimumSize(250,180)
-        self.config={"style":"Classic","size":18,"gap":5,"thickness":2,"color":"#00ff88","opacity":100,"dot":False,"outline":False}
+        self.config={"style":"Classic","size":18,"gap":5,"thickness":2,"color":"#00ff88","opacity":100,"dot":False,"outline":False,"outline_color":"#000000"}
     def set_config(self,cfg):
         self.config=dict(cfg); self.update()
     def paintEvent(self,event):
@@ -50,7 +50,7 @@ class CrosshairPreview(QWidget):
         c=QColor(self.config.get("color","#00ff88")); c.setAlphaF(max(.1,min(1,float(self.config.get("opacity",100))/100)))
         s=int(self.config.get("size",18)); g=int(self.config.get("gap",5)); t=int(self.config.get("thickness",2))
         x,y=self.width()//2,self.height()//2
-        outlined=bool(self.config.get("outline",False))
+        outlined=bool(self.config.get("outline",False)); outline_color=QColor(self.config.get("outline_color","#000000")); outline_color.setAlpha(c.alpha())
         def stroke(pen_color,width):
             p.setPen(QPen(pen_color,width,Qt.SolidLine,Qt.RoundCap)); p.setBrush(Qt.NoBrush)
             if self.config.get("style")=="Circle": p.drawEllipse(x-s//2,y-s//2,s,s)
@@ -63,7 +63,7 @@ class CrosshairPreview(QWidget):
                 p.setPen(Qt.NoPen); p.setBrush(QColor(0,0,0,c.alpha())); p.drawEllipse(x-d//2-2,y-d//2-2,d+4,d+4)
             p.setPen(Qt.NoPen); p.setBrush(c); p.drawEllipse(x-d//2,y-d//2,d,d)
         else:
-            if outlined: stroke(QColor(0,0,0,c.alpha()),t+4)
+            if outlined: stroke(outline_color,t+4)
             stroke(c,t)
             if self.config.get("dot"):
                 d=max(2,t*2)
@@ -87,7 +87,7 @@ class MainWindow(QMainWindow):
         sl.addWidget(brand)
         tagline=QLabel("PRECISION • CONTROL • PLAY"); tagline.setStyleSheet("font-size:8pt;color:#777d96;padding:0 16px 14px")
         sl.addWidget(tagline); self.nav=QListWidget()
-        self.pages=["Home","Browse Crosshairs","Designer","Saved Profiles","PC Monitor","Benchmarks","Settings"]
+        self.pages=["Home","Browse Crosshairs","Designer","Saved Profiles","PC Monitor","Benchmarks","Gaming Tweaks","Settings"]
         self.nav.addItems(self.pages); sl.addWidget(self.nav); sl.addStretch()
         self.overlay_status=QLabel("●  OVERLAY OFF"); self.overlay_status.setStyleSheet("color:#858ba3;padding:12px")
         sl.addWidget(self.overlay_status)
@@ -97,7 +97,7 @@ class MainWindow(QMainWindow):
         self.quick_toggle=QPushButton("Show Crosshair"); self.quick_toggle.setObjectName("accent"); self.quick_toggle.clicked.connect(self.toggle_overlay)
         header.addWidget(self.title); header.addStretch(); header.addWidget(self.quick_toggle); body.addLayout(header)
         self.stack=QStackedWidget()
-        for fn in [self.dashboard,self.browse_page,self.crosshair,self.profiles_page,self.monitor_page,self.benchmarks_page,self.settings_page]:
+        for fn in [self.dashboard,self.browse_page,self.crosshair,self.profiles_page,self.monitor_page,self.benchmarks_page,self.tweaks_page,self.settings_page]:
             self.stack.addWidget(fn())
         body.addWidget(self.stack); self.nav.currentRowChanged.connect(self.change_page); self.nav.setCurrentRow(0); root.addLayout(body,1)
 
@@ -166,7 +166,7 @@ class MainWindow(QMainWindow):
         self.style_box.setCurrentText(cfg.get("style","Classic")); self.size.setValue(int(cfg.get("size",18)))
         self.gap.setValue(int(cfg.get("gap",5))); self.thick.setValue(int(cfg.get("thickness",2)))
         op=float(cfg.get("opacity",100)); self.opacity.setValue(int(op*100 if op<=1 else op))
-        self.color_edit.setText(cfg.get("color","#00ff88")); self.dot.setChecked(bool(cfg.get("dot",False)))
+        self.color_edit.setText(cfg.get("color","#00ff88")); self.outline_color_edit.setText(cfg.get("outline_color","#000000")); self.dot.setChecked(bool(cfg.get("dot",False)))
         self.outline.setChecked(bool(cfg.get("outline",False))); self.update_crosshair_preview()
 
     def crosshair(self):
@@ -181,11 +181,15 @@ class MainWindow(QMainWindow):
         self.opacity=QSlider(Qt.Horizontal); self.opacity.setRange(10,100); self.opacity.setValue(100)
         self.opacity_value=QLabel("100%"); self.dot=QCheckBox("Center dot"); self.outline=QCheckBox("Outline (black border)")
         self.color_edit=QLineEdit("#00ff88"); self.color_edit.setMaxLength(7)
+        self.outline_color_edit=QLineEdit("#000000"); self.outline_color_edit.setMaxLength(7)
+        outline_pick=QPushButton("Pick outline"); outline_pick.clicked.connect(lambda:self.choose_specific_color(self.outline_color_edit))
+        outline_row=QHBoxLayout(); outline_row.addWidget(self.outline_color_edit); outline_row.addWidget(outline_pick)
         pick=QPushButton("Pick color"); pick.clicked.connect(self.choose_color)
         cr=QHBoxLayout(); cr.addWidget(self.color_edit); cr.addWidget(pick)
         for i,(name,widget) in enumerate([("Shape",self.style_box),("Size",self.size),("Gap",self.gap),("Thickness",self.thick),("Opacity",self.opacity)]):
             g.addWidget(QLabel(name),i,0); g.addWidget(widget,i,1)
-        g.addWidget(self.opacity_value,4,2); g.addWidget(self.dot,5,1); g.addWidget(self.outline,5,2); g.addWidget(QLabel("HEX color"),6,0); g.addLayout(cr,6,1,1,2)
+        g.addWidget(self.opacity_value,4,2); g.addWidget(self.dot,5,1); g.addWidget(self.outline,5,2); g.addWidget(QLabel("Crosshair color"),6,0); g.addLayout(cr,6,1,1,2)
+        g.addWidget(QLabel("Outline color"),7,0); g.addLayout(outline_row,7,1,1,2)
         content.addWidget(panel,3); pv=QVBoxLayout(); preview_title=QLabel("LIVE PREVIEW"); preview_title.setStyleSheet("font-weight:700;letter-spacing:1px;color:#aaa1d8"); pv.addWidget(preview_title); self.preview=CrosshairPreview(); pv.addWidget(self.preview,1); pv_frame=QFrame(); pv_frame.setObjectName("panel"); pv_frame.setLayout(pv); content.addWidget(pv_frame,2); l.addLayout(content,1)
         self.crosshair_game=QLineEdit(); self.crosshair_game.setPlaceholderText("Game name, e.g. Fortnite")
         row=QHBoxLayout(); row.addWidget(self.crosshair_game)
@@ -194,7 +198,7 @@ class MainWindow(QMainWindow):
         imp=QPushButton("Import preset"); imp.clicked.connect(self.import_crosshair); row.addWidget(imp); l.addLayout(row)
         actions=QHBoxLayout(); show=QPushButton("Apply & show overlay"); show.setObjectName("accent"); show.clicked.connect(self.apply_overlay)
         hide=QPushButton("Hide overlay"); hide.clicked.connect(self.hide_overlay); actions.addWidget(show); actions.addWidget(hide); l.addLayout(actions)
-        for widget,signal in [(self.style_box,self.style_box.currentTextChanged),(self.size,self.size.valueChanged),(self.gap,self.gap.valueChanged),(self.thick,self.thick.valueChanged),(self.opacity,self.opacity.valueChanged),(self.dot,self.dot.toggled),(self.outline,self.outline.toggled),(self.color_edit,self.color_edit.textChanged)]:
+        for widget,signal in [(self.style_box,self.style_box.currentTextChanged),(self.size,self.size.valueChanged),(self.gap,self.gap.valueChanged),(self.thick,self.thick.valueChanged),(self.opacity,self.opacity.valueChanged),(self.dot,self.dot.toggled),(self.outline,self.outline.toggled),(self.color_edit,self.color_edit.textChanged),(self.outline_color_edit,self.outline_color_edit.textChanged)]:
             signal.connect(self.update_crosshair_preview)
         self.opacity.valueChanged.connect(lambda v:self.opacity_value.setText(f"{v}%"))
         self.update_crosshair_preview(); return w
@@ -204,7 +208,7 @@ class MainWindow(QMainWindow):
         color=self.color_edit.text().strip()
         if not QColor.isValidColor(color): raise ValueError("Enter a valid HEX color such as #00ff88.")
         return {"style":self.style_box.currentText(),"size":self.size.value(),"gap":self.gap.value(),
-                "thickness":self.thick.value(),"color":QColor(color).name(),"opacity":self.opacity.value(),"dot":self.dot.isChecked(),"outline":self.outline.isChecked()}
+                "thickness":self.thick.value(),"color":QColor(color).name(),"opacity":self.opacity.value(),"dot":self.dot.isChecked(),"outline":self.outline.isChecked(),"outline_color":QColor(self.outline_color_edit.text().strip()).name() if QColor.isValidColor(self.outline_color_edit.text().strip()) else "#000000"}
 
     def update_crosshair_preview(self,*_):
         try: self.preview.set_config(self.crosshair_config())
@@ -273,6 +277,43 @@ class MainWindow(QMainWindow):
         b=QPushButton("Compare scenario"); b.setObjectName("accent"); b.clicked.connect(self.compare); l.addWidget(b)
         self.advice=QLabel("Enter scores and price."); self.advice.setWordWrap(True); l.addWidget(self.advice); l.addStretch(); return w
 
+    def tweaks_page(self):
+        w=QWidget(); l=QVBoxLayout(w)
+        intro=QLabel("One-click Windows gaming tweaks • reversible • no FPS promises. A restart or game relaunch may be required.")
+        intro.setObjectName("muted"); intro.setWordWrap(True); l.addWidget(intro)
+        cards=QGridLayout(); l.addLayout(cards)
+        items=[("Game Mode","Enable Windows Game Mode for supported games.","game_mode"),("Disable Game DVR","Turn off background capture to reduce overhead.","game_dvr"),("Mouse acceleration","Disable Windows pointer acceleration.","mouse"),("High performance power plan","Use more power; may increase heat and fan noise.","power")]
+        self.tweak_checks={}
+        for i,(name,desc,key) in enumerate(items):
+            card=QFrame(); card.setObjectName("panel"); cl=QVBoxLayout(card)
+            title=QLabel(name); title.setStyleSheet("font-weight:700;font-size:12pt")
+            note=QLabel(desc); note.setObjectName("muted"); note.setWordWrap(True)
+            status=QLabel("Not applied by AimForge"); status.setObjectName("muted")
+            cl.addWidget(title); cl.addWidget(note); cl.addWidget(status); self.tweak_checks[key]=status; cards.addWidget(card,i//2,i%2)
+        actions=QHBoxLayout()
+        apply=QPushButton("Apply Competitive Preset"); apply.setObjectName("accent"); apply.clicked.connect(self.apply_tweaks)
+        restore=QPushButton("Restore previous settings"); restore.clicked.connect(self.restore_tweaks)
+        actions.addWidget(apply); actions.addWidget(restore); l.addLayout(actions)
+        self.tweak_note=QLabel("Original values are saved before changes, so you can undo them."); self.tweak_note.setObjectName("muted"); self.tweak_note.setWordWrap(True); l.addWidget(self.tweak_note)
+        advanced=QPushButton("Open Windows Graphics settings"); advanced.clicked.connect(lambda:__import__("os").startfile("ms-settings:display-advancedgraphics"))
+        l.addWidget(advanced); l.addStretch(); return w
+
+    def apply_tweaks(self):
+        try:
+            from .tweaks import apply_competitive_preset
+            changed=apply_competitive_preset(); self.tweak_note.setText("Applied: "+", ".join(changed)+". FPS/latency gains depend on hardware and games.")
+            for status in self.tweak_checks.values(): status.setText("Applied / requested")
+            QMessageBox.information(self,"Tweaks applied","Preset applied. Results vary; no FPS or latency gain is guaranteed.")
+        except Exception as e: QMessageBox.critical(self,"Could not apply tweaks",str(e))
+
+    def restore_tweaks(self):
+        try:
+            from .tweaks import restore_previous_settings
+            restored=restore_previous_settings(); self.tweak_note.setText("Restored: "+(", ".join(restored) if restored else "No saved changes found."))
+            for status in self.tweak_checks.values(): status.setText("Restored / unchanged")
+            QMessageBox.information(self,"Restore complete","Saved Windows settings restored. A sign-out or restart may be needed.")
+        except Exception as e: QMessageBox.critical(self,"Restore failed",str(e))
+
     def settings_page(self):
         w=QWidget(); l=QVBoxLayout(w); l.addWidget(QLabel("Preferences & local data"))
         lang=QComboBox(); lang.addItems(LANGUAGES); lang.currentTextChanged.connect(self.set_language); l.addWidget(QLabel("Language")); l.addWidget(lang)
@@ -286,6 +327,11 @@ class MainWindow(QMainWindow):
         self.language=lang; self.setLayoutDirection(Qt.RightToLeft if lang in RTL else Qt.LeftToRight)
         for i,label in enumerate(LABELS.get(lang,LABELS["English"])): self.nav.item(i).setText(label)
 
+    def choose_specific_color(self, target):
+        current=target.text().strip()
+        c=QColorDialog.getColor(QColor(current if QColor.isValidColor(current) else "#000000"),self)
+        if c.isValid(): target.setText(c.name())
+
     def choose_color(self):
         current=self.color_edit.text().strip() if hasattr(self,"color_edit") else self.color
         c=QColorDialog.getColor(QColor(current if QColor.isValidColor(current) else "#00ff88"),self)
@@ -297,7 +343,7 @@ class MainWindow(QMainWindow):
         try: cfg=self.crosshair_config()
         except ValueError as e: QMessageBox.warning(self,"Invalid color",str(e)); return
         self.color=cfg["color"]
-        self.overlay.configure(cfg["size"],cfg["gap"],cfg["thickness"],cfg["color"],cfg["opacity"]/100,cfg["style"],cfg["dot"],cfg["outline"])
+        self.overlay.configure(cfg["size"],cfg["gap"],cfg["thickness"],cfg["color"],cfg["opacity"]/100,cfg["style"],cfg["dot"],cfg["outline"],cfg.get("outline_color","#000000"))
         screen=self.screen()
         if screen: self.overlay.setGeometry(screen.geometry())
         self.overlay.show()
