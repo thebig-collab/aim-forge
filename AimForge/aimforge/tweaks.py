@@ -48,6 +48,9 @@ def apply_competitive_preset():
             saved = json.loads(BACKUP.read_text(encoding="utf-8"))
         except (ValueError, OSError):
             saved = {}
+    if "power_plan" not in saved:
+        saved["power_plan"] = _power_plan()
+    BACKUP.write_text(json.dumps(saved, indent=2), encoding="utf-8")
     changed = []
     for root, path, name, kind, value, label in REGISTRY_CHANGES:
         ident = "HKCU\\" + path + "\\" + name
@@ -56,8 +59,6 @@ def apply_competitive_preset():
         _write_value(root, path, name, kind, value)
         if label not in changed:
             changed.append(label)
-    if "power_plan" not in saved:
-        saved["power_plan"] = _power_plan()
     subprocess.run(["powercfg", "/setactive", "SCHEME_MIN"], capture_output=True, text=True, check=True)
     changed.append("High performance power plan")
     BACKUP.write_text(json.dumps(saved, indent=2), encoding="utf-8")
