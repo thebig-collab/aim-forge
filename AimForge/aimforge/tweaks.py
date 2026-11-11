@@ -149,7 +149,7 @@ def restore_previous_settings():
     if saved.get("power_plan"):
         subprocess.run(["powercfg", "/setactive", saved["power_plan"]], capture_output=True, text=True, check=True)
         restored.append("Previous power plan")
-    if any(k.startswith(r"HKCU\Control Panel\Mouse\") for k in saved):
+    if any(k.startswith("HKCU\\\\Control Panel\\\\Mouse\\\\") for k in saved):
         _apply_mouse_now()
     BACKUP.unlink(missing_ok=True)
     return restored
