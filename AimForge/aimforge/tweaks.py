@@ -83,7 +83,13 @@ def _save_backup(saved):
 
 def _apply_mouse_now():
     try:
-        ctypes.windll.user32.SystemParametersInfoW(4, 0, (ctypes.c_int * 3)(0, 0, 0), 3)
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Control Panel\Mouse", 0, winreg.KEY_READ) as key:
+            values = [int(winreg.QueryValueEx(key, name)[0]) for name in ("MouseThreshold1", "MouseThreshold2", "MouseSpeed")]
+        params = (ctypes.c_int * 3)(*values)
+        user32 = ctypes.windll.user32
+        user32.SystemParametersInfoW.argtypes = [ctypes.c_uint, ctypes.c_uint, ctypes.c_void_p, ctypes.c_uint]
+        user32.SystemParametersInfoW.restype = ctypes.c_bool
+        user32.SystemParametersInfoW(4, 0, ctypes.byref(params), 3)
     except Exception:
         pass
 
