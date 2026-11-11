@@ -279,40 +279,77 @@ class MainWindow(QMainWindow):
 
     def tweaks_page(self):
         w=QWidget(); l=QVBoxLayout(w)
-        intro=QLabel("One-click Windows gaming tweaks • reversible • no FPS promises. A restart or game relaunch may be required.")
+        intro=QLabel("Reversible Windows gaming tweaks. Choose exactly what to change; no drivers, services, BIOS or overclocking are touched. Some changes need sign-out or restart.")
         intro.setObjectName("muted"); intro.setWordWrap(True); l.addWidget(intro)
-        cards=QGridLayout(); l.addLayout(cards)
-        items=[("Game Mode","Enable Windows Game Mode for supported games.","game_mode"),("Disable Game DVR","Turn off background capture to reduce overhead.","game_dvr"),("Mouse acceleration","Disable Windows pointer acceleration.","mouse"),("High performance power plan","Use more power; may increase heat and fan noise.","power")]
+        items=[
+            ("Windows Game Mode","Enable Game Mode for supported games.","game_mode"),
+            ("Disable background game capture","Turn off Game DVR recording and capture hooks.","game_dvr"),
+            ("Disable mouse acceleration","Turn off Enhance Pointer Precision (applies immediately).","mouse"),
+            ("Disable transparency","Reduce Windows transparency effects; visual preference only.","transparency"),
+            ("Best performance visual effects","Set Windows visual-effects preset to best performance. May make Windows look simpler.","animations"),
+            ("Reduce Xbox Game Bar overlay","Disable Game Bar startup panel and Nexus overlay integration.","gamebar"),
+            ("Restrict background apps","Set the per-user background-app permission switch off. May affect app notifications/sync.","background_apps"),
+            ("High performance power plan","Switch to Windows High performance plan. Uses more electricity and can increase heat/fan noise.","power"),
+        ]
         self.tweak_checks={}
+        cards=QGridLayout(); l.addLayout(cards)
         for i,(name,desc,key) in enumerate(items):
             card=QFrame(); card.setObjectName("panel"); cl=QVBoxLayout(card)
-            title=QLabel(name); title.setStyleSheet("font-weight:700;font-size:12pt")
+            title=QLabel(name); title.setStyleSheet("font-weight:700;font-size:11pt")
             note=QLabel(desc); note.setObjectName("muted"); note.setWordWrap(True)
-            status=QLabel("Not applied by AimForge"); status.setObjectName("muted")
-            cl.addWidget(title); cl.addWidget(note); cl.addWidget(status); self.tweak_checks[key]=status; cards.addWidget(card,i//2,i%2)
+            check=QCheckBox("Select")
+            check.setChecked(key in ("game_mode","game_dvr","mouse","power"))
+            status=QLabel("Checking…"); status.setObjectName("muted")
+            cl.addWidget(title); cl.addWidget(note); cl.addWidget(check); cl.addWidget(status)
+            self.tweak_checks[key]=(check,status); cards.addWidget(card,i//2,i%2)
         actions=QHBoxLayout()
-        apply=QPushButton("Apply Competitive Preset"); apply.setObjectName("accent"); apply.clicked.connect(self.apply_tweaks)
+        apply=QPushButton("Apply selected tweaks"); apply.setObjectName("accent"); apply.clicked.connect(self.apply_selected_tweaks)
+        preset=QPushButton("Apply all tweaks"); preset.clicked.connect(self.apply_tweaks)
         restore=QPushButton("Restore previous settings"); restore.clicked.connect(self.restore_tweaks)
-        actions.addWidget(apply); actions.addWidget(restore); l.addLayout(actions)
-        self.tweak_note=QLabel("Original values are saved before changes, so you can undo them."); self.tweak_note.setObjectName("muted"); self.tweak_note.setWordWrap(True); l.addWidget(self.tweak_note)
-        advanced=QPushButton("Open Windows Graphics settings"); advanced.clicked.connect(lambda:__import__("os").startfile("ms-settings:display-advancedgraphics"))
-        l.addWidget(advanced); l.addStretch(); return w
+        actions.addWidget(apply); actions.addWidget(preset); actions.addWidget(restore); l.addLayout(actions)
+        self.tweak_note=QLabel("Original Windows values are saved before the first change. Restore returns them to their previous values.")
+        self.tweak_note.setObjectName("muted"); self.tweak_note.setWordWrap(True); l.addWidget(self.tweak_note)
+        refresh=QPushButton("Refresh actual status"); refresh.clicked.connect(self.refresh_tweak_status); l.addWidget(refresh)
+        graphics=QPushButton("Open Windows Graphics settings"); graphics.clicked.connect(lambda:__import__("os").startfile("ms-settings:display-advancedgraphics"))
+        display=QPushButton("Open Display settings"); display.clicked.connect(lambda:__import__("os").startfile("ms-settings:display"))
+        l.addWidget(graphics); l.addWidget(display); l.addStretch()
+        self.refresh_tweak_status()
+        return w
+
+    def refresh_tweak_status(self):
+        try:
+            from .tweaks import get_tweak_status
+            statuses=get_tweak_status()
+            for key,(check,label) in self.tweak_checks.items():
+                label.setText(statuses.get(key,"Unknown"))
+        except Exception as e:
+            self.tweak_note.setText("Could not read Windows tweak status: "+str(e))
+
+    def apply_selected_tweaks(self):
+        selected=[key for key,(check,label) in self.tweak_checks.items() if check.isChecked()]
+        try:
+            from .tweaks import apply_tweaks
+            changed=apply_tweaks(selected)
+            self.tweak_note.setText("Applied: "+", ".join(changed)+". Changes depend on Windows version and hardware; FPS gains are not guaranteed.")
+            self.refresh_tweak_status()
+            QMessageBox.information(self,"Tweaks applied","Selected settings were applied. Some changes need sign-out, restart or a game relaunch. No FPS gain is guaranteed.")
+        except Exception as e:
+            self.refresh_tweak_status()
+            QMessageBox.critical(self,"Could not apply tweaks",str(e))
 
     def apply_tweaks(self):
-        try:
-            from .tweaks import apply_competitive_preset
-            changed=apply_competitive_preset(); self.tweak_note.setText("Applied: "+", ".join(changed)+". FPS/latency gains depend on hardware and games.")
-            for status in self.tweak_checks.values(): status.setText("Applied / requested")
-            QMessageBox.information(self,"Tweaks applied","Preset applied. Results vary; no FPS or latency gain is guaranteed.")
-        except Exception as e: QMessageBox.critical(self,"Could not apply tweaks",str(e))
+        for check,label in self.tweak_checks.values(): check.setChecked(True)
+        self.apply_selected_tweaks()
 
     def restore_tweaks(self):
         try:
             from .tweaks import restore_previous_settings
-            restored=restore_previous_settings(); self.tweak_note.setText("Restored: "+(", ".join(restored) if restored else "No saved changes found."))
-            for status in self.tweak_checks.values(): status.setText("Restored / unchanged")
-            QMessageBox.information(self,"Restore complete","Saved Windows settings restored. A sign-out or restart may be needed.")
-        except Exception as e: QMessageBox.critical(self,"Restore failed",str(e))
+            restored=restore_previous_settings()
+            self.tweak_note.setText("Restored: "+(", ".join(restored) if restored else "No saved changes found."))
+            self.refresh_tweak_status()
+            QMessageBox.information(self,"Restore complete","AimForge restored saved Windows values. Sign out or restart if a setting does not visibly update.")
+        except Exception as e:
+            QMessageBox.critical(self,"Restore failed",str(e))
 
     def settings_page(self):
         w=QWidget(); l=QVBoxLayout(w); l.addWidget(QLabel("Preferences & local data"))
