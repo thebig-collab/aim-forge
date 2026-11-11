@@ -12,12 +12,12 @@ class CrosshairOverlay(QWidget):
         self.setAttribute(Qt.WA_ShowWithoutActivating, True)
         self.size_px, self.gap, self.thickness = 18, 5, 2
         self.opacity, self.color, self.style = 1.0, QColor("#00ff88"), "Classic"
-        self.center_dot = False; self.outline = False
+        self.center_dot = False; self.outline = False; self.outline_color = QColor("#000000")
 
-    def configure(self, size_px, gap, thickness, color, opacity, style, center_dot=False, outline=False):
+    def configure(self, size_px, gap, thickness, color, opacity, style, center_dot=False, outline=False, outline_color="#000000"):
         self.size_px=max(2,min(100,int(size_px))); self.gap=max(0,min(50,int(gap)))
         self.thickness=max(1,min(12,int(thickness))); self.color=QColor(color)
-        self.opacity=max(.1,min(1,float(opacity))); self.style=style; self.center_dot=bool(center_dot); self.outline=bool(outline); self.update()
+        self.opacity=max(.1,min(1,float(opacity))); self.style=style; self.center_dot=bool(center_dot); self.outline=bool(outline); self.outline_color=QColor(outline_color); self.update()
 
     def paintEvent(self, event):
         p=QPainter(self); p.setRenderHint(QPainter.Antialiasing)
@@ -30,7 +30,7 @@ class CrosshairOverlay(QWidget):
                 p.drawLine(x-s,y,x-g,y); p.drawLine(x+g,y,x+s,y)
                 p.drawLine(x,y-s,x,y-g); p.drawLine(x,y+g,x,y+s)
         if self.outline and self.style!="Dot":
-            draw(QColor(0,0,0,c.alpha()),self.thickness+4)
+            outline=QColor(self.outline_color); outline.setAlpha(c.alpha()); draw(outline,self.thickness+4)
         if self.style=="Dot":
             d=max(2,self.thickness*2)
             if self.outline:
@@ -40,5 +40,5 @@ class CrosshairOverlay(QWidget):
         if self.center_dot and self.style!="Dot":
             d=max(2,self.thickness*2)
             if self.outline:
-                p.setBrush(QColor(0,0,0,c.alpha())); p.setPen(Qt.NoPen); p.drawEllipse(x-d//2-2,y-d//2-2,d+4,d+4)
+                outline=QColor(self.outline_color); outline.setAlpha(c.alpha()); p.setBrush(outline); p.setPen(Qt.NoPen); p.drawEllipse(x-d//2-2,y-d//2-2,d+4,d+4)
             p.setBrush(c); p.setPen(Qt.NoPen); p.drawEllipse(x-d//2,y-d//2,d,d)
