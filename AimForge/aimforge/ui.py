@@ -60,7 +60,7 @@ class CrosshairPreview(QWidget):
         if self.config.get("style")=="Dot":
             d=max(2,t*2)
             if outlined:
-                p.setPen(Qt.NoPen); p.setBrush(QColor(0,0,0,c.alpha())); p.drawEllipse(x-d//2-2,y-d//2-2,d+4,d+4)
+                p.setPen(Qt.NoPen); p.setBrush(outline_color); p.drawEllipse(x-d//2-2,y-d//2-2,d+4,d+4)
             p.setPen(Qt.NoPen); p.setBrush(c); p.drawEllipse(x-d//2,y-d//2,d,d)
         else:
             if outlined: stroke(outline_color,t+4)
